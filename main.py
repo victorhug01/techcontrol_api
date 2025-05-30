@@ -8,7 +8,6 @@ import firebase_messaging
 CHECK_INTERVAL = 1
 
 async def match_clients_and_maintenance():
-    
     print("[INFO] Iniciando busca por novos tickets...")
 
     clients = supabase.table("client").select("*").eq("status", "ABERTO").execute().data
@@ -38,19 +37,22 @@ async def match_clients_and_maintenance():
                 "score": str(best_score)
             }).execute()
 
-            firebase_messaging.sendNotification(titleMessage='Você tem 5 minutos para aceitar', bodyMessage='Concerto de geladeira', tokenMessage='cePBkq10S1WIh2CIpgfL0Q:APA91bEhTMgw7m4i4m97E0j2rj4e-XGlCOEflnJygXdNv2tMjwhPSSIkPQEDl5ECLXACj3iN8AeNYYcYgTw7rD1_F4irXPZjPeBEV4Ls7jq86tfxcgHBznk')
+            firebase_messaging.sendNotification(titleMessage='Você tem 5 minutos para aceitar', bodyMessage='Concerto de geladeira', tokenMessage='eMhCXt-SSjOogDC0ypowIW:APA91bE3RRGRQZJdWQO9ZN1UllYCf6WDNij_ORarIRSYo9qqIjKvViLO4RjOH3edyqAZYRFtR0fq1jeBhpreWM6yB-uschbaB87FiE7MFn3VlcqQ3539kLc')
             
             await wait_for_acceptance(client["id_client"], best_tech["id_maintenance"])
+
+            supabase.table("maintenance").update({"status": "EM MANUTENÇÃO"}).eq("id_maintenance", best_tech["id_maintenance"]).execute()
+            supabase.table("client").update({"status": "EM MANUTENÇÃO"}).eq("id_client", client["id_client"]).execute()
 
             technicians = supabase.table("maintenance").select("*").eq("status", "ATIVO").neq("status", "EM MANUTENÇÃO").execute().data
 
 async def wait_for_acceptance(client_id, tech_id):
-
+    
     print(f"[INFO] Aguardando aceitação de técnico {tech_id} para cliente {client_id}...")
 
     start_time = time.time()
 
-    while time.time() - start_time < 600:
+    while time.time() - start_time < 300:
 
         service = supabase.table("service").select("*").match({
             "fk_id_client": client_id,
@@ -65,7 +67,7 @@ async def wait_for_acceptance(client_id, tech_id):
         await asyncio.sleep(1)
 
     print(f"[TIMEOUT] Técnico {tech_id} não aceitou o serviço. Reatribuindo...")
-    supabase.table("service").update({"status": "SEM RESPOSTA"}).match({
+    supabase.table("service").update({"status": "cancelado"}).match({
         "fk_id_client": client_id,
         "fk_id_maintenance": tech_id
     }).execute()
